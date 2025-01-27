@@ -1,86 +1,103 @@
 "use client";
 
-import React, { useState } from "react";
-import StoreScene from "../components/StoreScene";
-import ProductForm from "../components/ProductForm";
-import ShelfForm from "../components/ShelfForm";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState, useEffect } from "react";
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls, Environment } from "@react-three/drei";
+import { ShelfUnit } from "../components/shelf-unit";
+import { GridLabels } from "../components/grid-labels";
+import { generateRandomProduct } from "../utils/product-generator";
 
-const initialProducts = [
-  {
-    id: "1",
-    name: "Cereal",
-    position: [0, 1, 0],
-    color: "yellow",
-    size: [0.5, 0.8, 0.3],
-  },
-  {
-    id: "2",
-    name: "Milk",
-    position: [1, 0.5, 0],
-    color: "white",
-    size: [0.3, 0.6, 0.3],
-  },
-  {
-    id: "3",
-    name: "Bread",
-    position: [-1, 0.2, 0],
-    color: "brown",
-    size: [0.6, 0.2, 0.3],
-  },
-];
+export default function SupermarketScene() {
+  const [shelves, setShelves] = useState([]);
+  const shelvesPerRow = 10;
+  const numberOfRows = 10;
+  const shelfSpacing = 4;
+  const rowSpacing = 2.5;
+  const productsPerShelfRow = 6;
 
-const initialShelves = [
-  { id: "1", position: [0, 0, 0], size: [4, 0.1, 4] },
-  { id: "2", position: [5, 0, 0], size: [4, 0.1, 4] },
-];
+  // Define shelf heights - products will be placed exactly at these heights
+  const shelfHeights = [0.2, 0.6, 1.0, 1.4, 1.8];
 
-export default function Home() {
-  const [products, setProducts] = useState(initialProducts);
-  const [shelves, setShelves] = useState(initialShelves);
+  useEffect(() => {
+    const generateShelves = () => {
+      const newShelves = [];
 
-  const handleProductUpdate = (newProduct) => {
-    setProducts((prevProducts) =>
-      prevProducts.some((product) => product.id === newProduct.id)
-        ? prevProducts.map((product) =>
-            product.id === newProduct.id
-              ? { ...product, ...newProduct }
-              : product
-          )
-        : [...prevProducts, newProduct]
-    );
-  };
+      for (let row = 0; row < numberOfRows; row++) {
+        for (let i = 0; i < shelvesPerRow; i++) {
+          const shelfX = (i - shelvesPerRow / 2) * shelfSpacing;
+          const shelfZ = row * rowSpacing;
+          const products = [];
 
-  const handleShelfUpdate = (newShelf) => {
-    setShelves((prevShelves) =>
-      prevShelves.some((shelf) => shelf.id === newShelf.id)
-        ? prevShelves.map((shelf) =>
-            shelf.id === newShelf.id ? { ...shelf, ...newShelf } : shelf
-          )
-        : [...prevShelves, newShelf]
-    );
-  };
+          // Generate products for each shelf level
+          shelfHeights.forEach((shelfHeight) => {
+            for (let p = 0; p < productsPerShelfRow; p++) {
+              const productX = -1.8 + p * 0.6;
+              products.push(
+                generateRandomProduct({
+                  x: productX,
+                  y: shelfHeight, // Place products exactly at shelf height
+                  z: 0,
+                })
+              );
+            }
+          });
+
+          newShelves.push({
+            id: `shelf-${row}-${i}`,
+            position: { x: shelfX, y: 0, z: shelfZ },
+            products,
+          });
+        }
+      }
+
+      setShelves(newShelves);
+    };
+
+    generateShelves();
+  }, []);
 
   return (
-    <div className="flex h-screen">
-      <div className="w-3/4">
-        <StoreScene products={products} shelves={shelves} />
-      </div>
-      <div className="w-1/4 p-4 bg-gray-100 overflow-y-auto">
-        <h2 className="text-2xl font-bold mb-4">Planogram Editor</h2>
-        <Tabs defaultValue="products">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="products">Products</TabsTrigger>
-            <TabsTrigger value="shelves">Shelves</TabsTrigger>
-          </TabsList>
-          <TabsContent value="products">
-            <ProductForm onSubmit={handleProductUpdate} />
-          </TabsContent>
-          <TabsContent value="shelves">
-            <ShelfForm onSubmit={handleShelfUpdate} />
-          </TabsContent>
-        </Tabs>
-      </div>
+    <div className="w-full h-screen">
+      <Canvas
+        camera={{
+          position: [0, 10, 20],
+          fov: 50,
+        }}
+      >
+        <color attach="background" args={["#f0f0f0"]} />
+        <ambientLight intensity={0.5} />
+        <directionalLight position={[5, 5, 5]} intensity={1} castShadow />
+        <Environment preset="warehouse" />
+
+        {/* Floor */}
+        <mesh
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[0, 0, 0]}
+          receiveShadow
+        >
+          <planeGeometry args={[100, 100]} />
+          <meshStandardMaterial color="#cccccc" />
+        </mesh>
+
+        {/* Grid Labels */}
+        <GridLabels
+          rows={numberOfRows}
+          columns={shelvesPerRow}
+          rowSpacing={rowSpacing}
+          columnSpacing={shelfSpacing}
+        />
+
+        {/* Shelves */}
+        {shelves.map((shelf) => (
+          <ShelfUnit key={shelf.id} shelf={shelf} />
+        ))}
+
+        <OrbitControls
+        // minDistance={5}
+        // maxDistance={30}
+        // maxPolarAngle={Math.PI / 2}
+        />
+      </Canvas>
     </div>
   );
 }
